@@ -82,3 +82,4 @@ The maps are hash tries. The sets and multisets are built on the maps.
 - [ ] auto-balance vec trees
 - [ ] replace hash tries with HAMT
 - [ ] performance tuning
+- [ ] add Rope-like persistent strings
