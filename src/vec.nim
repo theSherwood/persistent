@@ -24,25 +24,25 @@ type
     kLeaf
     kInterior
 
-  PVecSummary[T] = object
+  VecSummary[T] = object
     size*: Natural
     hash*: Hash
 
-  PVec*[T] = object
-    summary*: PVecSummary[T]
+  Vec*[T] = object
+    summary*: VecSummary[T]
     case kind*: NodeKind
       of kInterior:
         depth*: uint8
-        nodes: Chunk[BRANCH_WIDTH, PVecRef[T]]
-        node_summaries: Chunk[BRANCH_WIDTH, PVecSummary[T]]
+        nodes: Chunk[BRANCH_WIDTH, VecRef[T]]
+        node_summaries: Chunk[BRANCH_WIDTH, VecSummary[T]]
       of kLeaf:
         data*: Chunk[BUFFER_WIDTH, T]
-  PVecRef*[T] = ref PVec[T]
+  VecRef*[T] = ref Vec[T]
 
-  PathStackItem*[T] = tuple[node: PVecRef[T], len: int, index: int]
+  PathStackItem*[T] = tuple[node: VecRef[T], len: int, index: int]
   PathStack*[T] = seq[PathStackItem[T]]
 
-func debug_json*[T](s: PVecRef[T]): string =
+func debug_json*[T](s: VecRef[T]): string =
   result.add("{\n")
   result.add(&"  \"size\": {s.summary.size},\n")
   result.add(&"  \"kind\": \"{s.kind}\",\n")
@@ -60,7 +60,7 @@ func debug_json*[T](s: PVecRef[T]): string =
     result.add(&"  \"nodes\": [{inner}]\n")
   result.add("}")
 
-func `$`*[T](s: PVecRef[T]): string =
+func `$`*[T](s: VecRef[T]): string =
   var res = "["
   for it in s.items:
     res.add(&"{it}, ")
@@ -72,46 +72,46 @@ func `$`*[T](s: PVecRef[T]): string =
 # FORWARD DECLARATIONS
 # ===================================================================
 
-func init_sumtree*[T](d: T): PVecRef[T]
-func init_sumtree*[T](kind: NodeKind): PVecRef[T]
+func init_sumtree*[T](d: T): VecRef[T]
+func init_sumtree*[T](kind: NodeKind): VecRef[T]
 
-func clone*[T](s: PVecRef[T]): PVecRef[T]
+func clone*[T](s: VecRef[T]): VecRef[T]
 
-func im_delete_before*[T](s: PVecRef[T], idx: int): PVecRef[T]
-func im_delete_after*[T](s: PVecRef[T], idx: int): PVecRef[T]
+func im_delete_before*[T](s: VecRef[T], idx: int): VecRef[T]
+func im_delete_after*[T](s: VecRef[T], idx: int): VecRef[T]
 
-func pairs_closure[T](s: PVecRef[T]): iterator(): (int, T)
+func pairs_closure[T](s: VecRef[T]): iterator(): (int, T)
 
 
 # ===================================================================
 # SUMMARY OPERATIONS
 # ===================================================================
 
-func zero*[T](t: typedesc[PVecSummary[T]]): PVecSummary[T] =
+func zero*[T](t: typedesc[VecSummary[T]]): VecSummary[T] =
   result.size = 0
   result.hash = 0
 
-func `+`*[T](s1, s2: PVecSummary[T]): PVecSummary[T] =
+func `+`*[T](s1, s2: VecSummary[T]): VecSummary[T] =
   result.size = s1.size + s2.size
   result.hash = s1.hash xor s2.hash
-func `+`*[T](s: PVecSummary[T], it: T): PVecSummary[T] =
+func `+`*[T](s: VecSummary[T], it: T): VecSummary[T] =
   result.size = s.size + 1
   result.hash = s.hash xor it.hash
 
-func `-`*[T](s1, s2: PVecSummary[T]): PVecSummary[T] =
+func `-`*[T](s1, s2: VecSummary[T]): VecSummary[T] =
   result.size = s1.size - s2.size
   result.hash = s1.hash xor s2.hash
-func `-`*[T](s: PVecSummary[T], it: T): PVecSummary[T] =
+func `-`*[T](s: VecSummary[T], it: T): VecSummary[T] =
   result.size = s.size - 1
   result.hash = s.hash xor it.hash
 
-func from_buf*[T](t: typedesc[PVecSummary[T]], buf: openArray[T], l: Natural): PVecSummary[T] =
+func from_buf*[T](t: typedesc[VecSummary[T]], buf: openArray[T], l: Natural): VecSummary[T] =
   result.size = l.uint
   result.hash = 0
   for i in 0..<l:
     result.hash = result.hash xor buf[i].hash
 
-func from_item*[T](t: typedesc[PVecSummary[T]], it: T): PVecSummary[T] =
+func from_item*[T](t: typedesc[VecSummary[T]], it: T): VecSummary[T] =
   result.size = 1
   result.hash = it.hash
 
@@ -119,7 +119,7 @@ func from_item*[T](t: typedesc[PVecSummary[T]], it: T): PVecSummary[T] =
 # HELPERS
 # ===================================================================
 
-func depth_safe*[T](s: PVecRef[T]): uint8 =
+func depth_safe*[T](s: VecRef[T]): uint8 =
   if s.kind == kLeaf:
     return 0
   return s.depth
@@ -130,7 +130,7 @@ template find_local_node_index_by_total_idx_template*(s, idx: untyped) {.dirty.}
     node_idx: int
     adj_idx = idx
   block:
-    var candidate: PVecSummary[T]
+    var candidate: VecSummary[T]
     for i in 0..<s.node_summaries.len:
       candidate = s.node_summaries[i]
       if adj_idx >= candidate.size:
@@ -138,7 +138,7 @@ template find_local_node_index_by_total_idx_template*(s, idx: untyped) {.dirty.}
       else:
         node_idx = i
         break;
-func find_local_node_index_by_total_idx*[T](s: PVecRef[T], idx: int): (int, int) =
+func find_local_node_index_by_total_idx*[T](s: VecRef[T], idx: int): (int, int) =
   find_local_node_index_by_total_idx_template(s, idx)
   return (node_idx, adj_idx)
 
@@ -147,7 +147,7 @@ template find_leaf_node_at_index_template*(s, idx: untyped) {.dirty.} =
     n = s
     adj_idx = idx
   block:
-    var candidate: PVecSummary[T]
+    var candidate: VecSummary[T]
     while n.kind == kInterior:
       block inner:
         for i in 0..<n.nodes.len:
@@ -158,11 +158,11 @@ template find_leaf_node_at_index_template*(s, idx: untyped) {.dirty.} =
             n = n.nodes[i]
             break inner
 
-func find_leaf_node_at_index*[T](s: PVecRef[T], idx: int): (PVecRef[T], int) =
+func find_leaf_node_at_index*[T](s: VecRef[T], idx: int): (VecRef[T], int) =
   find_leaf_node_at_index_template(s, idx)
   return (n, adj_idx)
 
-func get_stack_to_leaf_at_index*[T](s: PVecRef[T], idx: int): PathStack[T] =
+func get_stack_to_leaf_at_index*[T](s: VecRef[T], idx: int): PathStack[T] =
   var stack: PathStack[T]
   if s.kind == kLeaf:
     stack.add((s, s.data.len, idx))
@@ -170,7 +170,7 @@ func get_stack_to_leaf_at_index*[T](s: PVecRef[T], idx: int): PathStack[T] =
     var
       n = s
       adj_idx = idx
-      candidate: PVecSummary[T]
+      candidate: VecSummary[T]
     while n.kind == kInterior:
       block inner:
         for i in 0..<n.nodes.len:
@@ -184,11 +184,11 @@ func get_stack_to_leaf_at_index*[T](s: PVecRef[T], idx: int): PathStack[T] =
     stack.add((n, n.data.len, adj_idx))
   return stack
 
-func shadow*[T](stack: var PathStack[T], child: PVecRef[T]): PVecRef[T] =
+func shadow*[T](stack: var PathStack[T], child: VecRef[T]): VecRef[T] =
   var 
     ch = child
     n_clone = child
-    n: PVecRef[T]
+    n: VecRef[T]
     l: int
     i: int
   while stack.len > 0:
@@ -201,15 +201,15 @@ func shadow*[T](stack: var PathStack[T], child: PVecRef[T]): PVecRef[T] =
     ch = n_clone
   return n_clone
 
-func get_minimum_root*[T](s: PVecRef[T]): PVecRef[T] =
+func get_minimum_root*[T](s: VecRef[T]): VecRef[T] =
   var n = s
   while n.kind == kInterior and n.nodes.len == 1:
     n = n.nodes[0]
   return n
 
 ## Does not change the Node kind
-proc reset*[T](s: PVecRef[T]) =
-  s.summary = PVecSummary[T].zero()
+proc reset*[T](s: VecRef[T]) =
+  s.summary = VecSummary[T].zero()
   if s.kind == kInterior:
     s.depth = 1
     s.nodes.len = 0
@@ -217,24 +217,24 @@ proc reset*[T](s: PVecRef[T]) =
   else:
     s.data.len = 0
 
-func resummarize*[T](s: PVecRef[T]) =
+func resummarize*[T](s: VecRef[T]) =
   if s.kind == kInterior:
-    s.summary = PVecSummary[T].zero()
+    s.summary = VecSummary[T].zero()
     for i in 0..<s.nodes.len:
       s.summary = s.summary + s.nodes[i].summary
       s.node_summaries[i] = s.nodes[i].summary
   else:
-    s.summary = PVecSummary[T].from_buf(s.data.buf, s.data.len)
+    s.summary = VecSummary[T].from_buf(s.data.buf, s.data.len)
 
-func compute_local_summary*[T](s: PVecRef[T]): PVecSummary[T] =
+func compute_local_summary*[T](s: VecRef[T]): VecSummary[T] =
   if s.kind == kLeaf:
-    result = PVecSummary[T].from_buf(s.data.buf, s.data.len)
+    result = VecSummary[T].from_buf(s.data.buf, s.data.len)
   else:
-    result = PVecSummary[T].zero()
+    result = VecSummary[T].zero()
     for i in 0..<s.nodes.len:
       result = result + s.nodes[i].summary
 
-func compute_local_size[T](s: PVecRef[T]): int =
+func compute_local_size[T](s: VecRef[T]): int =
   if s.kind == kLeaf:
     return s.data.len.int
   else:
@@ -243,19 +243,19 @@ func compute_local_size[T](s: PVecRef[T]): int =
       computed_size += s.node_summaries[i].size
     return computed_size
 
-func compute_local_depth[T](s: PVecRef[T]): uint8 =
+func compute_local_depth[T](s: VecRef[T]): uint8 =
   if s.kind == kLeaf:
     return 0
   else:
     var computed_depth: uint8 = 0
-    var n: PVecRef[T]
+    var n: VecRef[T]
     for i in 0..<s.nodes.len:
       n = s.nodes[i]
       if n.kind == kInterior:
         computed_depth = max(computed_depth, n.depth)
     return computed_depth + 1
 
-func tree_from_leaves[T](leaves: seq[PVecRef[T]]): PVecRef[T] =
+func tree_from_leaves[T](leaves: seq[VecRef[T]]): VecRef[T] =
   var
     layer = leaves
     interiors: type(layer)
@@ -275,72 +275,72 @@ func tree_from_leaves[T](leaves: seq[PVecRef[T]]): PVecRef[T] =
 # MUTABLE HELPERS
 # ===================================================================
 
-template mut_append_to_leaf_with_room*[T](s: PVecRef[T], d: T) =
+template mut_append_to_leaf_with_room*[T](s: VecRef[T], d: T) =
   s.data.add(d)
   s.summary = s.summary + d
-proc mut_append_to_leaf_with_room*[T](s: PVecRef[T], start_idx, end_idx: int, data: openArray[T]) =
+proc mut_append_to_leaf_with_room*[T](s: VecRef[T], start_idx, end_idx: int, data: openArray[T]) =
   var datum: T
   for i in start_idx..<end_idx:
     datum = data[i]
     s.data.add(datum)
     s.summary = s.summary + datum
-template mut_append_to_leaf_with_room*[T](s: PVecRef[T], len: int, data: openArray[T]) =
+template mut_append_to_leaf_with_room*[T](s: VecRef[T], len: int, data: openArray[T]) =
   mut_append_to_leaf_with_room(s, 0, len, data)
-template mut_append_to_leaf_with_room*[T](s: PVecRef[T], data: openArray[T]) =
+template mut_append_to_leaf_with_room*[T](s: VecRef[T], data: openArray[T]) =
   mut_append_to_leaf_with_room(s, 0, data.len, data)
 
-template mut_insert_in_leaf_with_room*[T](s: PVecRef[T], idx: int, d: T) =
+template mut_insert_in_leaf_with_room*[T](s: VecRef[T], idx: int, d: T) =
   s.data.insert(idx, d)
   s.summary = s.summary + d
-proc mut_insert_in_leaf_with_room*[T](s: PVecRef[T], idx: int, data: openArray[T]) =
+proc mut_insert_in_leaf_with_room*[T](s: VecRef[T], idx: int, data: openArray[T]) =
   s.data.insert(idx, data)
   for d in data:
     s.summary = s.summary + d
 
-template mut_prepend_to_leaf_with_room*[T](s: PVecRef[T], d: T) =
+template mut_prepend_to_leaf_with_room*[T](s: VecRef[T], d: T) =
   mut_insert_in_leaf_with_room(s, 0, d)
 
-proc mut_append_to_interior_with_room*[T](s, child: PVecRef[T]) =
+proc mut_append_to_interior_with_room*[T](s, child: VecRef[T]) =
   s.nodes.add(child)
   s.node_summaries.add(child.summary)
   s.summary = s.summary + child.summary
   s.depth = max(s.depth, child.depth_safe + 1)
-proc mut_append_to_interior_with_room*[T](s: PVecRef[T], start_idx, end_idx: int, children: openArray[PVecRef[T]]) =
-  var child: PVecRef[T]
+proc mut_append_to_interior_with_room*[T](s: VecRef[T], start_idx, end_idx: int, children: openArray[VecRef[T]]) =
+  var child: VecRef[T]
   for i in start_idx..<end_idx:
     child = children[i]
     s.nodes.add(child)
     s.node_summaries.add(child.summary)
     s.summary = s.summary + child.summary
     s.depth = max(s.depth, child.depth_safe + 1)
-template mut_append_to_interior_with_room*[T](s: PVecRef[T], len: int, children: openArray[PVecRef[T]]) =
+template mut_append_to_interior_with_room*[T](s: VecRef[T], len: int, children: openArray[VecRef[T]]) =
   mut_append_to_interior_with_room(s, 0, len, children)
-template mut_append_to_interior_with_room*[T](s: PVecRef[T], children: openArray[PVecRef[T]]) =
+template mut_append_to_interior_with_room*[T](s: VecRef[T], children: openArray[VecRef[T]]) =
   mut_append_to_interior_with_room(s, 0, children.len, children)
 
-proc mut_insert_in_interior_with_room*[T](s: PVecRef[T], idx: int, child: PVecRef[T]) =
+proc mut_insert_in_interior_with_room*[T](s: VecRef[T], idx: int, child: VecRef[T]) =
   s.nodes.insert(idx, child)
   s.node_summaries.insert(idx, child.summary)
   s.summary = s.summary + child.summary
   s.depth = max(s.depth, child.depth_safe + 1)
-proc mut_insert_in_interior_with_room*[T](s: PVecRef[T], idx: int, children: openArray[PVecRef[T]]) =
+proc mut_insert_in_interior_with_room*[T](s: VecRef[T], idx: int, children: openArray[VecRef[T]]) =
   s.nodes.insert(idx, children)
-  var summaries: seq[PVecSummary[T]]
+  var summaries: seq[VecSummary[T]]
   for child in children:
     summaries.add(child.summary)
     s.depth = max(s.depth, child.depth_safe + 1)
     s.summary = s.summary + child.summary
   s.node_summaries.insert(idx, summaries)
 
-template mut_prepend_to_interior_with_room*[T](s, child: PVecRef[T]) =
+template mut_prepend_to_interior_with_room*[T](s, child: VecRef[T]) =
   mut_insert_in_interior_with_room(s, 0, child)
 
-proc mut_pop_leaf*[T](s: PVecRef[T]): T =
+proc mut_pop_leaf*[T](s: VecRef[T]): T =
   var d = s.data.pop()
   s.summary = s.summary - d
   return d
 
-proc mut_pop_interior*[T](s: PVecRef[T]): PVecRef[T] =
+proc mut_pop_interior*[T](s: VecRef[T]): VecRef[T] =
   let child = s.nodes.pop()
   discard s.node_summaries.pop()
   s.summary = s.summary - child.summary
@@ -352,21 +352,21 @@ proc mut_pop_interior*[T](s: PVecRef[T]): PVecRef[T] =
 # IMMUTABLE HELPERS
 # ===================================================================
 
-func im_append_to_leaf_with_room*[T](s: PVecRef[T], d: T): PVecRef[T] =
+func im_append_to_leaf_with_room*[T](s: VecRef[T], d: T): VecRef[T] =
   result = s.clone
   result.mut_append_to_leaf_with_room(d)
 
-func im_append_to_leaf_no_room*[T](s: PVecRef[T], d: T): PVecRef[T] =
+func im_append_to_leaf_no_room*[T](s: VecRef[T], d: T): VecRef[T] =
   var new_leaf = init_sumtree[T](d)
   result = init_sumtree[T](kInterior)
   result.mut_append_to_interior_with_room(s)
   result.mut_append_to_interior_with_room(new_leaf)
 
-func im_prepend_to_leaf_with_room*[T](s: PVecRef[T], d: T): PVecRef[T] =
+func im_prepend_to_leaf_with_room*[T](s: VecRef[T], d: T): VecRef[T] =
   result = s.clone
   result.mut_prepend_to_leaf_with_room(d)
 
-func im_prepend_to_leaf_no_room*[T](s: PVecRef[T], d: T): PVecRef[T] =
+func im_prepend_to_leaf_no_room*[T](s: VecRef[T], d: T): VecRef[T] =
   var new_leaf = init_sumtree[T](d)
   result = init_sumtree[T](kInterior)
   result.mut_prepend_to_interior_with_room(s)
@@ -376,17 +376,17 @@ func im_prepend_to_leaf_no_room*[T](s: PVecRef[T], d: T): PVecRef[T] =
 # INITIALIZERS
 # ===================================================================
 
-func init_sumtree*[T](d: T): PVecRef[T] =
-  var s = PVecRef[T](kind: kLeaf)
+func init_sumtree*[T](d: T): VecRef[T] =
+  var s = VecRef[T](kind: kLeaf)
   s.mut_append_to_leaf_with_room(d)
   return s
-func init_sumtree*[T](kind: NodeKind): PVecRef[T] =
-  var s = PVecRef[T](kind: kind)
-  s.summary = PVecSummary[T].zero()
+func init_sumtree*[T](kind: NodeKind): VecRef[T] =
+  var s = VecRef[T](kind: kind)
+  s.summary = VecSummary[T].zero()
   return s
 
-func clone*[T](s: PVecRef[T]): PVecRef[T] =
-  result = PVecRef[T]()
+func clone*[T](s: VecRef[T]): VecRef[T] =
+  result = VecRef[T]()
   result.kind = s.kind
   result.summary = s.summary
   if result.kind == kLeaf:
@@ -396,14 +396,14 @@ func clone*[T](s: PVecRef[T]): PVecRef[T] =
     result.nodes = s.nodes
     result.node_summaries = s.node_summaries
 
-proc fill_sumtree_of_len*[T](len: int, filler: T): PVecRef[T] =
+proc fill_sumtree_of_len*[T](len: int, filler: T): VecRef[T] =
   if len == 0:
     return init_sumtree[T](kLeaf)
   var
     i = 0
     adj_size = len
-    n: PVecRef[T]
-    leaves: seq[PVecRef[T]]
+    n: VecRef[T]
+    leaves: seq[VecRef[T]]
   # build the leaves
   while adj_size >= 0:
     n = init_sumtree[T](kLeaf)
@@ -413,10 +413,10 @@ proc fill_sumtree_of_len*[T](len: int, filler: T): PVecRef[T] =
     i += BUFFER_WIDTH
     adj_size -= BUFFER_WIDTH
   return tree_from_leaves(leaves)
-template init_empty_sumtree_of_len*[T](len: int): PVecRef[T] =
+template init_empty_sumtree_of_len*[T](len: int): VecRef[T] =
   fill_sumtree_of_len[T](len, default(T))
 
-func to_sumtree*[T](its: openArray[T]): PVecRef[T] =
+func to_sumtree*[T](its: openArray[T]): VecRef[T] =
   if its.len == 0:
     return init_sumtree[T](kLeaf)
   if its.len <= BUFFER_WIDTH:
@@ -425,8 +425,8 @@ func to_sumtree*[T](its: openArray[T]): PVecRef[T] =
     return leaf
   var
     i = 0
-    n: PVecRef[T]
-    leaves: seq[PVecRef[T]]
+    n: VecRef[T]
+    leaves: seq[VecRef[T]]
   # build the leaves
   while i < its.len:
     n = init_sumtree[T](kLeaf)
@@ -440,7 +440,7 @@ template to_sumtree*(T: typedesc, iter: untyped): untyped =
   var
     i = 0
     n = init_sumtree[T](kLeaf)
-    leaves: seq[PVecRef[T]]
+    leaves: seq[VecRef[T]]
   # build the leaves
   for it in iter:
     if i == BUFFER_WIDTH:
@@ -457,10 +457,10 @@ template to_sumtree*(T: typedesc, iter: untyped): untyped =
 # GETTER API
 # ===================================================================
 
-func get*[T](s: PVecRef[T], idx: int): T =
+func get*[T](s: VecRef[T], idx: int): T =
   find_leaf_node_at_index_template(s, idx)
   return n.data[adj_idx]
-func get*[T](s: PVecRef[T], slice: Slice[int]): PVecRef[T] =
+func get*[T](s: VecRef[T], slice: Slice[int]): VecRef[T] =
   if slice.a > s.summary.size:
     result = init_sumtree[T](kLeaf)
   elif s.kind == kLeaf:
@@ -470,16 +470,16 @@ func get*[T](s: PVecRef[T], slice: Slice[int]): PVecRef[T] =
   else:
     result = s.im_delete_before(slice.a).im_delete_after(slice.b - slice.a)
 
-template `[]`*[T](s: PVecRef[T], idx: int): T = s.get(idx)
-template `[]`*[T](s: PVecRef[T], slice: Slice[int]): PVecRef[T] = s.get(slice)
+template `[]`*[T](s: VecRef[T], idx: int): T = s.get(idx)
+template `[]`*[T](s: VecRef[T], slice: Slice[int]): VecRef[T] = s.get(slice)
 
-func get_or_default*[T](s: PVecRef[T], idx: int, d: T): T =
+func get_or_default*[T](s: VecRef[T], idx: int, d: T): T =
   if idx < 0 or idx >= s.len: return d
   find_leaf_node_at_index_template(s, idx)
   return n.data[adj_idx]
-template get_or_default*[T](s: PVecRef[T], idx: int): T = get_or_default[T](s, idx, default(T))
+template get_or_default*[T](s: VecRef[T], idx: int): T = get_or_default[T](s, idx, default(T))
 
-func valid*[T](s: PVecRef[T]): bool =
+func valid*[T](s: VecRef[T]): bool =
   for n in s.nodes_post_order:
     if n.summary.size != n.compute_local_size:
       debugEcho "size"
@@ -506,12 +506,12 @@ func valid*[T](s: PVecRef[T]): bool =
         return false
   return true
 
-template len*[T](s: PVecRef[T]): Natural = s.summary.size
-template size*[T](s: PVecRef[T]): Natural = s.summary.size
-template low*[T](s: PVecRef[T]): Natural = 0
-template high*[T](s: PVecRef[T]): Natural = s.summary.size - 1
+template len*[T](s: VecRef[T]): Natural = s.summary.size
+template size*[T](s: VecRef[T]): Natural = s.summary.size
+template low*[T](s: VecRef[T]): Natural = 0
+template high*[T](s: VecRef[T]): Natural = s.summary.size - 1
 
-func `==`*[T](v1, v2: PVecRef[T]): bool  =
+func `==`*[T](v1, v2: VecRef[T]): bool  =
   if v1.isNil:
     if v2.isNil: return true
     return false
@@ -533,12 +533,12 @@ func `==`*[T](v1, v2: PVecRef[T]): bool  =
 # ITERATORS
 # ===================================================================
 
-iterator nodes_pre_order*[T](s: PVecRef[T]): PVecRef[T] =
+iterator nodes_pre_order*[T](s: VecRef[T]): VecRef[T] =
   # yield after we push onto the stack
   var
     n = s
     idx: Natural
-    n_stack: seq[PVecRef[T]]
+    n_stack: seq[VecRef[T]]
     idx_stack: seq[Natural]
   if s.kind == kLeaf:
     yield s
@@ -569,12 +569,12 @@ iterator nodes_pre_order*[T](s: PVecRef[T]): PVecRef[T] =
           discard idx_stack.pop()
           idx_stack[^1] += 1
 
-iterator nodes_post_order*[T](s: PVecRef[T]): PVecRef[T] =
+iterator nodes_post_order*[T](s: VecRef[T]): VecRef[T] =
   # yield before we pop off the stack
   var
     n = s
     idx: Natural
-    n_stack: seq[PVecRef[T]]
+    n_stack: seq[VecRef[T]]
     idx_stack: seq[Natural]
   if s.kind == kLeaf:
     yield s
@@ -605,7 +605,7 @@ iterator nodes_post_order*[T](s: PVecRef[T]): PVecRef[T] =
           discard idx_stack.pop()
           idx_stack[^1] += 1
 
-iterator leaves*[T](s: PVecRef[T]): PVecRef[T] =
+iterator leaves*[T](s: VecRef[T]): VecRef[T] =
   var
     n = s
     sz = 0
@@ -629,7 +629,7 @@ iterator leaves*[T](s: PVecRef[T]): PVecRef[T] =
         discard stack.pop()
         if stack.len > 0: stack[^1][2] += 1
 
-iterator leaves_reverse*[T](s: PVecRef[T]): PVecRef[T] =
+iterator leaves_reverse*[T](s: VecRef[T]): VecRef[T] =
   var
     n = s
     sz = 0
@@ -657,47 +657,47 @@ iterator leaves_reverse*[T](s: PVecRef[T]): PVecRef[T] =
         discard stack.pop()
         if stack.len > 0: stack[^1][2] -= 1
 
-template iterate_pairs*[T](s: PVecRef[T]) {.dirty.} =
+template iterate_pairs*[T](s: VecRef[T]) {.dirty.} =
   var total_idx = 0
   for n in s.leaves:
     for it in n.data.items:
       yield (total_idx, it)
       total_idx += 1
 
-template iterate_pairs_reverse*[T](s: PVecRef[T]) {.dirty.} =
+template iterate_pairs_reverse*[T](s: VecRef[T]) {.dirty.} =
   var total_idx = s.len
   for n in s.leaves_reverse:
     for i in countdown(n.data.len - 1, 0):
       total_idx -= 1
       yield (total_idx, n.data[i])
 
-iterator pairs*[T](s: PVecRef[T]): (int, T) =
+iterator pairs*[T](s: VecRef[T]): (int, T) =
   iterate_pairs(s)
-iterator pairs_reverse*[T](s: PVecRef[T]): (int, T) =
+iterator pairs_reverse*[T](s: VecRef[T]): (int, T) =
   iterate_pairs_reverse(s)
-iterator items*[T](s: PVecRef[T]): T =
+iterator items*[T](s: VecRef[T]): T =
   for (idx, d) in s.pairs:
     yield d
-iterator items_reverse*[T](s: PVecRef[T]): T =
+iterator items_reverse*[T](s: VecRef[T]): T =
   for (idx, d) in s.pairs_reverse:
     yield d
-func pairs_closure[T](s: PVecRef[T]): iterator(): (int, T) =
+func pairs_closure[T](s: VecRef[T]): iterator(): (int, T) =
   return iterator(): (int, T) =
     iterate_pairs(s)
 
-iterator map_iter*[T, U](s: PVecRef[T], op: proc (x: T, idx: int): U {.closure.}): U =
+iterator map_iter*[T, U](s: VecRef[T], op: proc (x: T, idx: int): U {.closure.}): U =
   for (idx, d) in s.pairs:
     yield op(d, idx)
-iterator map_iter*[T, U](s: PVecRef[T], op: proc (x: T): U {.closure.}): U =
+iterator map_iter*[T, U](s: VecRef[T], op: proc (x: T): U {.closure.}): U =
   for (idx, d) in s.pairs:
     yield op(d)
-iterator filter_iter*[T](s: PVecRef[T], pred: proc (x: T, idx: int): bool {.closure.}): T =
+iterator filter_iter*[T](s: VecRef[T], pred: proc (x: T, idx: int): bool {.closure.}): T =
   for (idx, d) in s.pairs:
     if pred(d, idx): yield d
-iterator filter_iter*[T](s: PVecRef[T], pred: proc (x: T): bool {.closure.}): T =
+iterator filter_iter*[T](s: VecRef[T], pred: proc (x: T): bool {.closure.}): T =
   for (idx, d) in s.pairs:
     if pred(d): yield d
-iterator zip_iter*[T, U](s1: PVecRef[T], s2: PVecRef[U]): (T, U) =
+iterator zip_iter*[T, U](s1: VecRef[T], s2: VecRef[U]): (T, U) =
   var
     t1 = s1.pairs_closure()
     t2 = s2.pairs_closure()
@@ -705,36 +705,36 @@ iterator zip_iter*[T, U](s1: PVecRef[T], s2: PVecRef[U]): (T, U) =
     yield (t1()[1], t2()[1])
 
 # TODO - figure out how to deal with iterables for flat_map
-# iterator flat_map*[T, U](s: PVecRef[T], op: proc (x: T, idx: int): iterable[U] {.closure.}): U =
+# iterator flat_map*[T, U](s: VecRef[T], op: proc (x: T, idx: int): iterable[U] {.closure.}): U =
 #   for (idx, d) in s.pairs:
 #     for item in op(d, idx):
 #       yield item
-# iterator flat_map*[T, U](s: PVecRef[T], op: proc (x: T): iterable[U] {.closure.}): U =
+# iterator flat_map*[T, U](s: VecRef[T], op: proc (x: T): iterable[U] {.closure.}): U =
 #   for (idx, d) in s.pairs:
 #     for item in op(d):
 #       yield item
 
-func map*[T, U](s: PVecRef[T], op: proc (x: T, idx: int): U {.closure.}): PVecRef[U] =
+func map*[T, U](s: VecRef[T], op: proc (x: T, idx: int): U {.closure.}): VecRef[U] =
   to_sumtree(U, map_iter[T, U](s, op))
-func map*[T, U](s: PVecRef[T], op: proc (x: T): U {.closure.}): PVecRef[U] =
+func map*[T, U](s: VecRef[T], op: proc (x: T): U {.closure.}): VecRef[U] =
   to_sumtree(U, map_iter[T, U](s, op))
-func filter*[T](s: PVecRef[T], pred: proc (x: T, idx: int): bool {.closure.}): PVecRef[T] =
+func filter*[T](s: VecRef[T], pred: proc (x: T, idx: int): bool {.closure.}): VecRef[T] =
   to_sumtree(T, filter_iter[T](s, pred))
-func filter*[T](s: PVecRef[T], pred: proc (x: T): bool {.closure.}): PVecRef[T] =
+func filter*[T](s: VecRef[T], pred: proc (x: T): bool {.closure.}): VecRef[T] =
   to_sumtree(T, filter_iter[T](s, pred))
-proc zip*[T, U](s1: PVecRef[T], s2: PVecRef[U]): PVecRef[(T, U)] =
+proc zip*[T, U](s1: VecRef[T], s2: VecRef[U]): VecRef[(T, U)] =
   to_sumtree((T, U), zip_iter[T, U](s1, s2))
 
-func reverse*[T](s: PVecRef[T]): PVecRef[T] =
+func reverse*[T](s: VecRef[T]): VecRef[T] =
   to_sumtree(T, items_reverse[T](s))
 
 # ===================================================================
 # MUTABLE API
 # ===================================================================
 
-proc mut_append*[T](s: PVecRef[T], d: T) =
+proc mut_append*[T](s: VecRef[T], d: T) =
   var n = s
-  var stack: seq[PVecRef[T]]
+  var stack: seq[VecRef[T]]
   while n.kind == kInterior:
     stack.add(n)
     n = n.nodes[n.nodes.len - 1]
@@ -752,12 +752,12 @@ proc mut_append*[T](s: PVecRef[T], d: T) =
 # IMMUTABLE API
 # ===================================================================
 
-func im_delete_before*[T](s: PVecRef[T], idx: int): PVecRef[T] =
+func im_delete_before*[T](s: VecRef[T], idx: int): VecRef[T] =
   if idx <= 0: return s
   if idx >= s.len: return init_sumtree[T](kLeaf)
   var stack = get_stack_to_leaf_at_index(s, idx)
   var (n, l, i) = stack.pop()
-  var n_clone: PVecRef[T]
+  var n_clone: VecRef[T]
   if i == 0:
     result = n
   else:
@@ -770,14 +770,14 @@ func im_delete_before*[T](s: PVecRef[T], idx: int): PVecRef[T] =
     n_clone.mut_append_to_interior_with_room(i + 1, n.nodes.len, n.nodes.buf)
     result = n_clone
   result = result.get_minimum_root
-template im_drop*[T](s: PVecRef[T], idx: int): PVecRef[T] = s.im_delete_before(idx)
+template im_drop*[T](s: VecRef[T], idx: int): VecRef[T] = s.im_delete_before(idx)
 
-func im_delete_after*[T](s: PVecRef[T], idx: int): PVecRef[T] =
+func im_delete_after*[T](s: VecRef[T], idx: int): VecRef[T] =
   if idx < 0: return init_sumtree[T](kLeaf)
   if idx >= s.len: return s
   var stack = get_stack_to_leaf_at_index(s, idx)
   var (n, l, i) = stack.pop()
-  var n_clone: PVecRef[T]
+  var n_clone: VecRef[T]
   if i == l - 1:
     result = n
   else:
@@ -790,9 +790,9 @@ func im_delete_after*[T](s: PVecRef[T], idx: int): PVecRef[T] =
     n_clone.mut_append_to_interior_with_room(result)
     result = n_clone
   result = result.get_minimum_root
-template im_take*[T](s: PVecRef[T], idx: int): PVecRef[T] = s.im_delete_after(idx - 1)
+template im_take*[T](s: VecRef[T], idx: int): VecRef[T] = s.im_delete_after(idx - 1)
 
-func im_concat*[T](s1, s2: PVecRef[T]): PVecRef[T] =
+func im_concat*[T](s1, s2: VecRef[T]): VecRef[T] =
   if s2.len == 0: return s1
   if s1.len == 0: return s2
   # TODO - take depth into account to try not to be too imbalanced
@@ -808,7 +808,7 @@ func im_concat*[T](s1, s2: PVecRef[T]): PVecRef[T] =
   elif kinds == (kLeaf, kInterior):
     var
       stack = get_stack_to_leaf_at_index[T](s2, 0)
-      child: PVecRef[T] 
+      child: VecRef[T] 
       (n, l, i) = stack.pop()
     if s1.data.len + l <= BUFFER_WIDTH:
       child = init_sumtree[T](kLeaf)
@@ -830,7 +830,7 @@ func im_concat*[T](s1, s2: PVecRef[T]): PVecRef[T] =
   elif kinds == (kInterior, kLeaf):
     var
       stack = get_stack_to_leaf_at_index[T](s1, s1.len - 1)
-      child: PVecRef[T] 
+      child: VecRef[T] 
       (n, l, i) = stack.pop()
     if n.data.len + s2.data.len <= BUFFER_WIDTH:
       child = init_sumtree[T](kLeaf)
@@ -857,7 +857,7 @@ func im_concat*[T](s1, s2: PVecRef[T]): PVecRef[T] =
     else:
       result.mut_append_to_interior_with_room([s1, s2])
 
-func im_append*[T](s: PVecRef[T], d: T): PVecRef[T] =
+func im_append*[T](s: VecRef[T], d: T): VecRef[T] =
   var stack = get_stack_to_leaf_at_index[T](s, s.len - 1)
   var stack_len = stack.len
   var (n, l, i) = stack.pop()
@@ -878,7 +878,7 @@ func im_append*[T](s: PVecRef[T], d: T): PVecRef[T] =
         # appending could cause that increased depth to be maintained for other
         # nodes unnecessarily.
         for j in 0..<min(n.depth.int - 1, 2):
-          var s = PVecRef[T](kind: kInterior)
+          var s = VecRef[T](kind: kInterior)
           s.mut_append_to_interior_with_room(new_child)
           new_child = s
         var n_clone = n.clone()
@@ -886,7 +886,7 @@ func im_append*[T](s: PVecRef[T], d: T): PVecRef[T] =
         return shadow[T](stack, n_clone)
   return n.im_append_to_leaf_no_room(d)
 
-func im_prepend*[T](s: PVecRef[T], d: T): PVecRef[T] =
+func im_prepend*[T](s: VecRef[T], d: T): VecRef[T] =
   var stack = get_stack_to_leaf_at_index[T](s, 0)
   var stack_len = stack.len
   var (n, l, i) = stack.pop()
@@ -907,7 +907,7 @@ func im_prepend*[T](s: PVecRef[T], d: T): PVecRef[T] =
         # prepending could cause that increased depth to be maintained for other
         # nodes unnecessarily.
         for j in 0..<min(n.depth.int - 1, 2):
-          var s = PVecRef[T](kind: kInterior)
+          var s = VecRef[T](kind: kInterior)
           s.mut_prepend_to_interior_with_room(new_child)
           new_child = s
         var n_clone = n.clone()
@@ -915,40 +915,40 @@ func im_prepend*[T](s: PVecRef[T], d: T): PVecRef[T] =
         return shadow[T](stack, n_clone)
   return n.im_prepend_to_leaf_no_room(d)
 
-func im_splice*[T](s: PVecRef[T], idx, length: int, items: openArray[T]): PVecRef[T] =
+func im_splice*[T](s: VecRef[T], idx, length: int, items: openArray[T]): VecRef[T] =
   var l = max(0, length)
   doAssert idx >= 0 and idx < s.len
   return im_concat(
     im_concat(s.take(idx), to_sumtree[T](items)),
     s.drop(idx + l)
   )
-func im_splice*[T](s: PVecRef[T], idx, length: int, vec: PVecRef[T]): PVecRef[T] =
+func im_splice*[T](s: VecRef[T], idx, length: int, vec: VecRef[T]): VecRef[T] =
   var l = max(0, length)
   doAssert idx >= 0 and idx < s.len
   return im_concat(
     im_concat(s.take(idx), vec),
     s.drop(idx + l)
   )
-func im_splice*[T](s: PVecRef[T], idx, length: int): PVecRef[T] =
+func im_splice*[T](s: VecRef[T], idx, length: int): VecRef[T] =
   if length < 1: return s
   doAssert idx >= 0 and idx < s.len
   return im_concat(s.take(idx), s.drop(idx + length))
 
-template im_splice*[T](s: PVecRef[T], slice: Slice[int], items: openArray[T]): PVecRef[T] =
+template im_splice*[T](s: VecRef[T], slice: Slice[int], items: openArray[T]): VecRef[T] =
   s.im_splice(slice.a, slice.b + 1 - slice.a, items)
-template im_splice*[T](s: PVecRef[T], slice: Slice[int], vec: PVecRef[T]): PVecRef[T] =
+template im_splice*[T](s: VecRef[T], slice: Slice[int], vec: VecRef[T]): VecRef[T] =
   s.im_splice(slice.a, slice.b + 1 - slice.a, vec)
-template im_splice*[T](s: PVecRef[T], slice: Slice[int]): PVecRef[T] =
+template im_splice*[T](s: VecRef[T], slice: Slice[int]): VecRef[T] =
   s.im_splice(slice.a, slice.b + 1 - slice.a)
 
-template im_delete*[T](s: PVecRef[T], slice: Slice[int]): PVecRef[T] =
+template im_delete*[T](s: VecRef[T], slice: Slice[int]): VecRef[T] =
   s.im_splice(slice)
-template im_insert*[T](s: PVecRef[T], items: openArray[T], idx: int): PVecRef[T] =
+template im_insert*[T](s: VecRef[T], items: openArray[T], idx: int): VecRef[T] =
   s.im_splice(idx, 0, items)
-template im_insert*[T](s: PVecRef[T], vec: PVecRef[T], idx: int): PVecRef[T] =
+template im_insert*[T](s: VecRef[T], vec: VecRef[T], idx: int): VecRef[T] =
   s.im_splice(idx, 0, vec)
 
-proc im_set*[T](s: PVecRef[T], idx: int, d: T): PVecRef[T] =
+proc im_set*[T](s: VecRef[T], idx: int, d: T): VecRef[T] =
   ## TODO - handle indices that don't yet exist.
   if idx < 0 or idx > s.len:
     raise newException(IndexError, "Index is out of bounds")
@@ -958,17 +958,17 @@ proc im_set*[T](s: PVecRef[T], idx: int, d: T): PVecRef[T] =
   n_clone.summary = n_clone.summary - n_clone.data[i] + d
   n_clone.data[i] = d
   return shadow[T](stack, n_clone)
-template im_set*[T](s: PVecRef[T], slice: Slice[int], data: openArray[T]): PVecRef[T] =
+template im_set*[T](s: VecRef[T], slice: Slice[int], data: openArray[T]): VecRef[T] =
   s.im_splice(slice, data)
-template im_set*[T](s: PVecRef[T], slice: Slice[int], vec: PVecRef[T]): PVecRef[T] =
+template im_set*[T](s: VecRef[T], slice: Slice[int], vec: VecRef[T]): VecRef[T] =
   s.im_splice(slice, vec)
 
-func im_set_len*[T](s: PVecRef[T], len: int): PVecRef[T] =
+func im_set_len*[T](s: VecRef[T], len: int): VecRef[T] =
   if len == s.len: return s
   if len < s.len: return s.take(len)
   return im_concat(s, fill_sumtree_of_len[T](len - s.len, default(T)))
 
-func im_pop*[T](s: PVecRef[T]): (PVecRef[T], T) =
+func im_pop*[T](s: VecRef[T]): (VecRef[T], T) =
   var stack = get_stack_to_leaf_at_index[T](s, s.len - 1)
   var (n, l, i) = stack.pop()
   var datum: T
@@ -991,32 +991,32 @@ func im_pop*[T](s: PVecRef[T]): (PVecRef[T], T) =
 # VEC API
 # ===================================================================
 
-template init_vec*[T](): PVecRef[T] = init_sumtree[T](kLeaf)
-template to_vec*[T](items: openArray[T]): PVecRef[T] = to_sumtree[T](items)
-template to_vec*[T](iter: iterator): PVecRef[T] = to_sumtree[T](iter)
+template init_vec*[T](): VecRef[T] = init_sumtree[T](kLeaf)
+template to_vec*[T](items: openArray[T]): VecRef[T] = to_sumtree[T](items)
+template to_vec*[T](iter: iterator): VecRef[T] = to_sumtree[T](iter)
 
-template append*[T](vec: PVecRef[T], item: T): PVecRef[T] = vec.im_append(item)
-template push*[T](vec: PVecRef[T], item: T): PVecRef[T] = vec.im_append(item)
-template add*[T](vec: PVecRef[T], item: T): PVecRef[T] = vec.im_append(item)
+template append*[T](vec: VecRef[T], item: T): VecRef[T] = vec.im_append(item)
+template push*[T](vec: VecRef[T], item: T): VecRef[T] = vec.im_append(item)
+template add*[T](vec: VecRef[T], item: T): VecRef[T] = vec.im_append(item)
 
-template prepend*[T](vec: PVecRef[T], item: T): PVecRef[T] = vec.im_prepend(item)
-template push_front*[T](vec: PVecRef[T], item: T): PVecRef[T] = vec.im_prepend(item)
+template prepend*[T](vec: VecRef[T], item: T): VecRef[T] = vec.im_prepend(item)
+template push_front*[T](vec: VecRef[T], item: T): VecRef[T] = vec.im_prepend(item)
 
-template pop*[T](vec: PVecRef[T]): (PVecRef[T], T) = vec.im_pop()
+template pop*[T](vec: VecRef[T]): (VecRef[T], T) = vec.im_pop()
 
-template set*[T](vec: PVecRef[T], idx: int, item: T): PVecRef[T] = vec.im_set(idx, item)
-template set*[T](vec: PVecRef[T], slice: Slice[int], data: openArray[T]): PVecRef[T] = vec.im_set(slice, data)
-template set*[T](vec: PVecRef[T], slice: Slice[int], data: PVecRef[T]): PVecRef[T] = vec.im_set(slice, data)
+template set*[T](vec: VecRef[T], idx: int, item: T): VecRef[T] = vec.im_set(idx, item)
+template set*[T](vec: VecRef[T], slice: Slice[int], data: openArray[T]): VecRef[T] = vec.im_set(slice, data)
+template set*[T](vec: VecRef[T], slice: Slice[int], data: VecRef[T]): VecRef[T] = vec.im_set(slice, data)
 
-template set_len*[T](vec: PVecRef[T], len: int): PVecRef[T] = vec.im_set_len(len)
+template set_len*[T](vec: VecRef[T], len: int): VecRef[T] = vec.im_set_len(len)
 
-template delete*[T](s: PVecRef[T], slice: Slice[int]): PVecRef[T] = s.im_delete(slice)
+template delete*[T](s: VecRef[T], slice: Slice[int]): VecRef[T] = s.im_delete(slice)
 
-template insert*[T](s: PVecRef[T], items: openArray[T], idx: int): PVecRef[T] = s.im_insert(items, idx)
-template insert*[T](s: PVecRef[T], vec: PVecRef[T], idx: int): PVecRef[T] = s.im_insert(vec, idx)
+template insert*[T](s: VecRef[T], items: openArray[T], idx: int): VecRef[T] = s.im_insert(items, idx)
+template insert*[T](s: VecRef[T], vec: VecRef[T], idx: int): VecRef[T] = s.im_insert(vec, idx)
 
-template concat*[T](s1, s2: PVecRef[T]): PVecRef[T] = im_concat(s1, s2)
-template `&`*[T](s1, s2: PVecRef[T]): PVecRef[T] = im_concat(s1, s2)
+template concat*[T](s1, s2: VecRef[T]): VecRef[T] = im_concat(s1, s2)
+template `&`*[T](s1, s2: VecRef[T]): VecRef[T] = im_concat(s1, s2)
 
-template drop*[T](s: PVecRef[T], idx: int): PVecRef[T] = s.im_drop(idx)
-template take*[T](s: PVecRef[T], idx: int): PVecRef[T] = s.im_take(idx)
+template drop*[T](s: VecRef[T], idx: int): VecRef[T] = s.im_drop(idx)
+template take*[T](s: VecRef[T], idx: int): VecRef[T] = s.im_take(idx)

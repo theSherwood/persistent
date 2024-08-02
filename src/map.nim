@@ -62,11 +62,11 @@ type
         nodes: array[BRANCH_WIDTH, NodeListEntry[K, V]]
   MapNodeRef*[K, V] = ref MapNode[K, V]
 
-  PMap*[K, V] = object
+  Map*[K, V] = object
     node*: MapNode[K, V]
     hash*: Hash
     size*: Natural
-  PMapRef*[K, V] = ref PMap[K, V]
+  MapRef*[K, V] = ref Map[K, V]
 
   PathStack[K, V] = Chunk[32, tuple[parent: MapNodeRef[K, V], index: int]]
   
@@ -109,16 +109,16 @@ template entry_hash*[K, V](h_entry: HashedEntryBox[K, V]): Hash =
 template entry_hash*[K, V](h_entry: HashedEntry[K, V]): Hash =
   (h_entry.hash and TOP_BIT_MASK) + (hash(h_entry.value) and TOP_BIT_MASK)
 
-func init_map*[K, V](): PMapRef[K, V]  =
-  ## Returns a new `PMap`
-  result = PMapRef[K, V]()
+func init_map*[K, V](): MapRef[K, V]  =
+  ## Returns a new `Map`
+  result = MapRef[K, V]()
   result.node = MapNode[K, V](kind: Array)
 
-func len*[K, V](m: PMapRef[K, V]): Natural =
-  ## Returns the number of key-value pairs in the `PMap`
+func len*[K, V](m: MapRef[K, V]): Natural =
+  ## Returns the number of key-value pairs in the `Map`
   m.size
 
-iterator interior_nodes*[K, V](m: PMapRef[K, V]): MapNodeRef[K, V] =
+iterator interior_nodes*[K, V](m: MapRef[K, V]): MapNodeRef[K, V] =
   if m.node.kind == Interior:
     var
       node = cast[MapNodeRef[K, V]](m.node.addr)
@@ -140,8 +140,8 @@ iterator interior_nodes*[K, V](m: PMapRef[K, V]): MapNodeRef[K, V] =
         else:
           stack[stack.len-1].index += 1
 
-iterator hashed_entries*[K, V](m: PMapRef[K, V]): HashedEntry[K, V] =
-  ## Iterates over the hash-key-value triples in the `PMap`
+iterator hashed_entries*[K, V](m: MapRef[K, V]): HashedEntry[K, V] =
+  ## Iterates over the hash-key-value triples in the `Map`
   if m.node.kind == Array:
     for h_entry in m.node.entries:
       yield h_entry
@@ -172,24 +172,24 @@ iterator hashed_entries*[K, V](m: PMapRef[K, V]): HashedEntry[K, V] =
           of kInterior:
             stack.add((node_list_entry.node, 0))
 
-iterator pairs*[K, V](m: PMapRef[K, V]): (K, V) =
-  ## Iterates over the key-value entries in the `PMap`
+iterator pairs*[K, V](m: MapRef[K, V]): (K, V) =
+  ## Iterates over the key-value entries in the `Map`
   for h_entry in m.hashed_entries:
     yield h_entry.entry
-iterator keys*[K, V](m: PMapRef[K, V]): K =
-  ## Iterates over the keys in the `PMap`
+iterator keys*[K, V](m: MapRef[K, V]): K =
+  ## Iterates over the keys in the `Map`
   for h_entry in m.hashed_entries:
     yield h_entry.key
-iterator values*[K, V](m: PMapRef[K, V]): V =
-  ## Iterates over the values in the `PMap`
+iterator values*[K, V](m: MapRef[K, V]): V =
+  ## Iterates over the values in the `Map`
   for h_entry in m.hashed_entries:
     yield h_entry.value
-iterator items*[K, V](m: PMapRef[K, V]): V =
-  ## Iterates over the values in the `PMap`
+iterator items*[K, V](m: MapRef[K, V]): V =
+  ## Iterates over the values in the `Map`
   for h_entry in m.hashed_entries:
     yield h_entry.value
 
-template mut_add_to_interior_map[K, V](m: PMapRef[K, V], h_entry: HashedEntry[K, V]): untyped =
+template mut_add_to_interior_map[K, V](m: MapRef[K, V], h_entry: HashedEntry[K, V]): untyped =
   var
     h = h_entry.hash
     bits = 0
@@ -293,23 +293,23 @@ template mut_add_to_interior_map[K, V](m: PMapRef[K, V], h_entry: HashedEntry[K,
           )
           break outer
 
-func to_interior_map[K, V](pairs: openArray[(K, V)]): PMapRef[K, V] =
-  result = PMapRef[K, V]()
+func to_interior_map[K, V](pairs: openArray[(K, V)]): MapRef[K, V] =
+  result = MapRef[K, V]()
   result.node = MapNode[K, V](kind: Interior)
   for p in pairs:
     mut_add_to_interior_map(result, HashedEntry[K, V](hash: hash(p[0]), entry: p))
-func to_interior_map[K, V](entries: openArray[HashedEntry[K, V]]): PMapRef[K, V] =
-  result = PMapRef[K, V]()
+func to_interior_map[K, V](entries: openArray[HashedEntry[K, V]]): MapRef[K, V] =
+  result = MapRef[K, V]()
   result.node = MapNode[K, V](kind: Interior)
   for e in entries:
     mut_add_to_interior_map(result, e)
-func to_interior_map[K, V](map: PMapRef[K, V]): PMapRef[K, V] =
-  result = PMapRef[K, V]()
+func to_interior_map[K, V](map: MapRef[K, V]): MapRef[K, V] =
+  result = MapRef[K, V]()
   result.node = MapNode[K, V](kind: Interior)
   for e in map.hashed_entries:
     mut_add_to_interior_map(result, e)
 
-template add_to_array_map*[K, V](m: PMapRef[K, V], h_entry: HashedEntry[K, V]): untyped  =
+template add_to_array_map*[K, V](m: MapRef[K, V], h_entry: HashedEntry[K, V]): untyped  =
   result.node = MapNode[K, V](kind: Array)
   result.hash = m.hash xor entry_hash(h_entry)
   result.node.entries.add(h_entry)
@@ -324,8 +324,8 @@ template add_to_array_map*[K, V](m: PMapRef[K, V], h_entry: HashedEntry[K, V]): 
       result.node.entries.add(e)
   result.size = result.node.entries.len
 
-func add_impl*[K, V](m: PMapRef[K, V], h_entry: HashedEntry[K, V]): PMapRef[K, V]  =
-  result = PMapRef[K, V]()
+func add_impl*[K, V](m: MapRef[K, V], h_entry: HashedEntry[K, V]): MapRef[K, V]  =
+  result = MapRef[K, V]()
   if m.size < ARRAY_WIDTH:
     add_to_array_map[K, V](m, h_entry)
   elif m.node.kind == Array:
@@ -337,7 +337,7 @@ func add_impl*[K, V](m: PMapRef[K, V], h_entry: HashedEntry[K, V]): PMapRef[K, V
       ## TODO - don't do an immutable add here
       result = result.add_impl(h_entry)
   elif m.node.kind == Interior:
-    result = PMapRef[K, V]()
+    result = MapRef[K, V]()
     result.node = m.node
     result.hash = m.hash xor entry_hash(h_entry)
     result.size = m.size + 1
@@ -447,20 +447,20 @@ func add_impl*[K, V](m: PMapRef[K, V], h_entry: HashedEntry[K, V]): PMapRef[K, V
           parent = node
           index = (h shr bits) and MASK
           node_list_entry = parent.nodes[index]
-template add*[K, V](m: PMapRef[K, V], key: K, value: V): PMapRef[K, V] =
+template add*[K, V](m: MapRef[K, V], key: K, value: V): MapRef[K, V] =
   add_impl(m, HashedEntry[K, V](hash: hash(key), entry: (key, value)))
-template add*[K, V](m: PMapRef[K, V], pair: (K, V)): PMapRef[K, V] =
+template add*[K, V](m: MapRef[K, V], pair: (K, V)): MapRef[K, V] =
   add_impl(m, HashedEntry[K, V](hash: hash(pair[0]), entry: pair))
-template add*[K, V](m: PMapRef[K, V], he: HashedEntry[K, V]): PMapRef[K, V] =
+template add*[K, V](m: MapRef[K, V], he: HashedEntry[K, V]): MapRef[K, V] =
   add_impl(m, he)
-template add_by_hash*[K, V](m: PMapRef[K, V], h: Hash, key: K, value: V): PMapRef[K, V] =
+template add_by_hash*[K, V](m: MapRef[K, V], h: Hash, key: K, value: V): MapRef[K, V] =
   add_impl(m, HashedEntry[K, V](hash: h, entry: (key, value)))
-template add_by_hash*[K, V](m: PMapRef[K, V], h: Hash, pair: (K, V)): PMapRef[K, V] =
+template add_by_hash*[K, V](m: MapRef[K, V], h: Hash, pair: (K, V)): MapRef[K, V] =
   add_impl(m, HashedEntry[K, V](hash: h, entry: pair))
 
-func delete_by_hash*[K, V](m: PMapRef[K, V], h: Hash, key: K): PMapRef[K, V] =
-  ## Deletes the key-value pair at `key` from the `PMap`
-  result = PMapRef[K, V]()
+func delete_by_hash*[K, V](m: MapRef[K, V], h: Hash, key: K): MapRef[K, V] =
+  ## Deletes the key-value pair at `key` from the `Map`
+  result = MapRef[K, V]()
   if m.node.kind == Array:
     result.node = MapNode[K, V](kind: Array)
     result.hash = m.hash
@@ -474,7 +474,7 @@ func delete_by_hash*[K, V](m: PMapRef[K, V], h: Hash, key: K): PMapRef[K, V] =
     if result.size < m.size: return result
     else: return m
   else:
-    result = PMapRef[K, V]()
+    result = MapRef[K, V]()
     result.node = m.node
     result.hash = m.hash
     result.size = m.size + 1
@@ -552,10 +552,10 @@ func delete_by_hash*[K, V](m: PMapRef[K, V], h: Hash, key: K): PMapRef[K, V] =
           parent = node
           index = (h shr bits) and MASK
           node_list_entry = parent.nodes[index]
-template delete*[K, V](m: PMapRef[K, V], key: K): PMapRef[K, V] =
+template delete*[K, V](m: MapRef[K, V], key: K): MapRef[K, V] =
   delete_by_hash(m, hash(key), key)
 
-template get_impl*[K, V](m: PMapRef[K, V], h: Hash, key: K, SUCCESS, FAILURE: untyped): untyped =
+template get_impl*[K, V](m: MapRef[K, V], h: Hash, key: K, SUCCESS, FAILURE: untyped): untyped =
   if m.node.kind == Array:
     for h_entry in m.node.entries:
       if h_entry.hash == h and h_entry.key == key:
@@ -591,43 +591,43 @@ template get_success(h_entry: untyped): untyped =
   return h_entry.value
 template get_failure(): untyped =
   raise newException(KeyError, "Key not found")
-func get*[K, V](m: PMapRef[K, V], key: K): V =
+func get*[K, V](m: MapRef[K, V], key: K): V =
   let h = hash(key)
   get_impl[K, V](m, h, key, get_success, get_failure)
-template `[]`*[K, V](m: PMapRef[K, V], key: K): V = m.get(key)
-func get_by_hash*[K, V](m: PMapRef[K, V], h: Hash, key: K): V =
+template `[]`*[K, V](m: MapRef[K, V], key: K): V = m.get(key)
+func get_by_hash*[K, V](m: MapRef[K, V], h: Hash, key: K): V =
   get_impl[K, V](m, h, key, get_success, get_failure)
 
 template get_or_default_failure() {.dirty.} =
   return def
-func get_or_default*[K, V](m: PMapRef[K, V], key: K, def: V): V =
+func get_or_default*[K, V](m: MapRef[K, V], key: K, def: V): V =
   let h = hash(key)
   get_impl[K, V](m, h, key, get_success, get_or_default_failure)
-template get_or_default*[K, V](m: PMapRef[K, V], key: K): V =
+template get_or_default*[K, V](m: MapRef[K, V], key: K): V =
   get_or_default[K, V](m, key, V.default)
-func get_or_default_by_hash*[K, V](m: PMapRef[K, V], h: Hash, key: K, def: V): V =
+func get_or_default_by_hash*[K, V](m: MapRef[K, V], h: Hash, key: K, def: V): V =
   get_impl[K, V](m, h, key, get_success, get_or_default_failure)
-template get_or_default_by_hash*[K, V](m: PMapRef[K, V], h: Hash, key: K): V =
+template get_or_default_by_hash*[K, V](m: MapRef[K, V], h: Hash, key: K): V =
   get_or_default_by_hash[K, V](m, h, key, V.default)
 
 template get_tuple_success(h_entry: untyped): untyped =
   return (h_entry.value, true)
 template get_tuple_failure(): untyped =
   return (default[V](V), false)
-func get_tuple_by_hash[K, V](m: PMapRef[K, V], h: Hash, key: K): (V, bool) =
+func get_tuple_by_hash[K, V](m: MapRef[K, V], h: Hash, key: K): (V, bool) =
   get_impl[K, V](m, h, key, get_tuple_success, get_tuple_failure)
 
 template contains_success(h_entry: untyped): untyped =
   return true
 template contains_failure(): untyped =
   return false
-func contains*[K, V](m: PMapRef[K, V], key: K): bool =
+func contains*[K, V](m: MapRef[K, V], key: K): bool =
   let h = hash(key)
   get_impl[K, V](m, h, key, contains_success, contains_failure)
-func contains*[K, V](m: PMapRef[K, V], h: Hash, key: K): bool =
+func contains*[K, V](m: MapRef[K, V], h: Hash, key: K): bool =
   get_impl[K, V](m, h, key, contains_success, contains_failure)
 
-func update_by_hash*[K, V](m: PMapRef[K, V], h: Hash, key: K, update_fn: UpdateFn[V]): PMapRef[K, V] =
+func update_by_hash*[K, V](m: MapRef[K, V], h: Hash, key: K, update_fn: UpdateFn[V]): MapRef[K, V] =
   let (old_val, exists) = m.get_tuple_by_hash(h, key)
   let (new_val, should_exist) = update_fn(old_val, exists)
   if should_exist:
@@ -636,11 +636,11 @@ func update_by_hash*[K, V](m: PMapRef[K, V], h: Hash, key: K, update_fn: UpdateF
     return m.delete_by_hash(h, key)
   else:
     return m
-template update*[K, V](m: PMapRef[K, V], key: K, update_fn: UpdateFn[V]): PMapRef[K, V] =
+template update*[K, V](m: MapRef[K, V], key: K, update_fn: UpdateFn[V]): MapRef[K, V] =
   update_by_hash(m, hash(key), key, update_fn)
 
-proc `==`*[K, V](m1: PMapRef[K, V], m2: PMapRef[K, V]): bool  =
-  ## Returns whether the `PMap`s are equal
+proc `==`*[K, V](m1: MapRef[K, V], m2: MapRef[K, V]): bool  =
+  ## Returns whether the `Map`s are equal
   if m1.isNil:
     if m2.isNil: return true
     return false
@@ -652,24 +652,24 @@ proc `==`*[K, V](m1: PMapRef[K, V], m2: PMapRef[K, V]): bool  =
     if not(exists) or v != m2_v: return false
   return true
 
-func to_map*[K, V](arr: openArray[(K, V)]): PMapRef[K, V] =
-  ## Returns a `PMap` containing the key-value pairs in `arr`
+func to_map*[K, V](arr: openArray[(K, V)]): MapRef[K, V] =
+  ## Returns a `Map` containing the key-value pairs in `arr`
   var m = init_map[K, V]()
   for (k, v) in arr:
     m = m.add(k, v)
   m
 
-func `$`*[K, V](m: PMapRef[K, V]): string =
-  ## Returns a string representing the `PMap`
+func `$`*[K, V](m: MapRef[K, V]): string =
+  ## Returns a string representing the `Map`
   var x = newSeq[string]()
   for (k, v) in m.pairs:
     x.add($k & ": " & $v)
   "{" & strutils.join(x, ", ") & "}"
 
-func hash*[K, V](m: PMapRef[K, V]): Hash  =
+func hash*[K, V](m: MapRef[K, V]): Hash  =
   return m.hash
 
-func to_json*[K, V](m: PMapRef[K, V]): string =
+func to_json*[K, V](m: MapRef[K, V]): string =
   if m.len == 0: return "{}"
   result.add("{\n")
   block:
@@ -714,7 +714,7 @@ proc debug_json*[K, V](n: MapNodeRef[K, V]): string =
     result.add(&"  \"nodes\": [{nodes}]")
   result.add("}")
 
-proc debug_json*[K, V](m: PMapRef[K, V]): string =
+proc debug_json*[K, V](m: MapRef[K, V]): string =
   result.add("{\n")
   result.add(&"  \"size\": {m.size},\n")
   result.add(&"  \"hash\": {m.hash},\n")
@@ -722,7 +722,7 @@ proc debug_json*[K, V](m: PMapRef[K, V]): string =
   result.add(&"  \"node\": {debug_json[K, V](node)}\n")
   result.add("}")
 
-func valid*[K, V](m: PMapRef[K, V]): bool =
+func valid*[K, V](m: MapRef[K, V]): bool =
   var size = 0
   if m.node.kind == Array:
     size = m.node.entries.len
@@ -755,13 +755,13 @@ func valid*[K, V](m: PMapRef[K, V]): bool =
     return false
   return true
 
-func concat*[K, V](m1, m2: PMapRef[K, V]): PMapRef[K, V] =
+func concat*[K, V](m1, m2: MapRef[K, V]): MapRef[K, V] =
   ## This is shamefully inneficient
   ## TODO - implement transients so that this can be faster.
   result = m1
   for he in m2.hashed_entries:
     result = result.add(he)
-template `&`*[K, V](m1, m2: PMapRef[K, V]): PMapRef[K, V] =
+template `&`*[K, V](m1, m2: MapRef[K, V]): MapRef[K, V] =
   concat(m1, m2)
 
 # ====================================================================
@@ -770,43 +770,43 @@ template `&`*[K, V](m1, m2: PMapRef[K, V]): PMapRef[K, V] =
 
 type
   EmptyValue = object
-  PSet*[K] = distinct PMap[K, EmptyValue]
-  PSetRef*[K] = ref PSet[K]
+  Set*[K] = distinct Map[K, EmptyValue]
+  SetRef*[K] = ref Set[K]
 
 const empty = EmptyValue()
 
-template as_set*[K](m: PMapRef[K, EmptyValue]): PSetRef[K] =
-  cast[PSetRef[K]](m)
-template as_map*[K](s: PSetRef[K]): PMapRef[K, EmptyValue] =
-  cast[PMapRef[K, EmptyValue]](s)
+template as_set*[K](m: MapRef[K, EmptyValue]): SetRef[K] =
+  cast[SetRef[K]](m)
+template as_map*[K](s: SetRef[K]): MapRef[K, EmptyValue] =
+  cast[MapRef[K, EmptyValue]](s)
 
-func init_set*[K](): PSetRef[K] =
+func init_set*[K](): SetRef[K] =
   result = init_map[K, EmptyValue]().as_set
-func to_set*[K](arr: openArray[K]): PSetRef[K] =
+func to_set*[K](arr: openArray[K]): SetRef[K] =
   var m = init_map[K, EmptyValue]()
   for k in arr:
     m = m.add(k, empty)
   return m.as_set
-template hash*[K](s: PSetRef[K]): Hash =
+template hash*[K](s: SetRef[K]): Hash =
   s.as_map.hash
-template incl*[K](s: PSetRef[K], key: K): PSetRef[K] =
+template incl*[K](s: SetRef[K], key: K): SetRef[K] =
   s.as_map.add(key, empty).as_set
-template excl*[K](s: PSetRef[K], key: K): PSetRef[K] =
+template excl*[K](s: SetRef[K], key: K): SetRef[K] =
   s.as_map.delete(key).as_set
-template contains*[K](s: PSetRef[K], key: K): bool =
+template contains*[K](s: SetRef[K], key: K): bool =
   s.as_map.contains(key)
-template len*[K](s: PSetRef[K]): Natural =
+template len*[K](s: SetRef[K]): Natural =
   s.as_map.len
-iterator items*[K](s: PSetRef[K]): K =
+iterator items*[K](s: SetRef[K]): K =
   for k in s.as_map.keys:
     yield k
-iterator values*[K](s: PSetRef[K]): K =
+iterator values*[K](s: SetRef[K]): K =
   for k in s.as_map.keys:
     yield k
-iterator keys*[K](s: PSetRef[K]): K =
+iterator keys*[K](s: SetRef[K]): K =
   for k in s.as_map.keys:
     yield k
-func `==`*[K](s1, s2: PSetRef[K]): bool =
+func `==`*[K](s1, s2: SetRef[K]): bool =
   if s1.isNil:
     if s2.isNil: return true
     return false
@@ -818,9 +818,9 @@ func `==`*[K](s1, s2: PSetRef[K]): bool =
       if k notin s2:
         return false
     return true
-template valid*[K](s: PSetRef[K]): bool =
+template valid*[K](s: SetRef[K]): bool =
   s.as_map.valid
-func to_json*[K](s: PSetRef[K]): string =
+func to_json*[K](s: SetRef[K]): string =
   if s.len == 0: return "[]"
   result.add("[ ")
   block:
@@ -829,7 +829,7 @@ func to_json*[K](s: PSetRef[K]): string =
     # trim off the last comma because json doesn't allow trailing commas
     result.delete((result.len - 2)..<result.len)
   result.add(" ]")
-func `$`*[K](s: PSetRef[K]): string =
+func `$`*[K](s: SetRef[K]): string =
   if s.len == 0: return "{}"
   result.add("{ ")
   block:
@@ -844,15 +844,15 @@ func `$`*[K](s: PSetRef[K]): string =
 # ====================================================================
 
 type
-  PMultiset*[K] = distinct PMap[K, int]
-  PMultisetRef*[K] = ref PMultiset[K]
+  Multiset*[K] = distinct Map[K, int]
+  MultisetRef*[K] = ref Multiset[K]
 
-template as_mset*[K](m: PMapRef[K, int]): PMultisetRef[K] =
-  cast[PMultisetRef[K]](m)
-template as_map*[K](s: PMultisetRef[K]): PMapRef[K, int] =
-  cast[PMapRef[K, int]](s)
+template as_mset*[K](m: MapRef[K, int]): MultisetRef[K] =
+  cast[MultisetRef[K]](m)
+template as_map*[K](s: MultisetRef[K]): MapRef[K, int] =
+  cast[MapRef[K, int]](s)
 
-func `[]`*[K](s: PMultisetRef[K]): PMap[K, int] =
+func `[]`*[K](s: MultisetRef[K]): Map[K, int] =
   return as_map(s)[]
 
 func multiset_incl_update*[V](v: V, exists: bool): (V, bool) =
@@ -861,9 +861,9 @@ func multiset_incl_update*[V](v: V, exists: bool): (V, bool) =
 func multiset_excl_update*[V](v: V, exists: bool): (V, bool) =
   if v == 1: return (0, false)
   return (v - 1, true)
-template incl*[K](s: PMultisetRef[K], key: K): PMultisetRef[K] =
+template incl*[K](s: MultisetRef[K], key: K): MultisetRef[K] =
   s.as_map.update(key, multiset_incl_update).as_mset
-template excl*[K](s: PMultisetRef[K], key: K): PMultisetRef[K] =
+template excl*[K](s: MultisetRef[K], key: K): MultisetRef[K] =
   s.as_map.update(key, multiset_excl_update).as_mset
 
 var multiset_update_count = 1
@@ -875,53 +875,53 @@ proc multiset_excl_update_count*[V](v: V, exists: bool): (V, bool) =
   let new_v = v - multiset_update_count
   if new_v == 0: return (0, false)
   return (new_v, true)
-proc incl*[K](s: PMultisetRef[K], key: K, count: int): PMultisetRef[K] =
+proc incl*[K](s: MultisetRef[K], key: K, count: int): MultisetRef[K] =
   multiset_update_count = count
   result = s.as_map.update(key, multiset_incl_update_count).as_mset
   multiset_excl_update_count = 1
-proc excl*[K](s: PMultisetRef[K], key: K, count: int): PMultisetRef[K] =
+proc excl*[K](s: MultisetRef[K], key: K, count: int): MultisetRef[K] =
   multiset_update_count = count
   result = s.as_map.update(key, multiset_excl_update_count).as_mset
   multiset_excl_update_count = 1
 
-func init_multiset*[K](): PMultisetRef[K] =
+func init_multiset*[K](): MultisetRef[K] =
   result = init_map[K, int]().as_mset
-func to_multiset*[K](arr: openArray[K]): PMultisetRef[K] =
+func to_multiset*[K](arr: openArray[K]): MultisetRef[K] =
   var m = init_multiset[K]()
   for k in arr:
     m = m.incl(k)
   return m
-func to_multiset*[K](arr: openArray[(K, int)]): PMultisetRef[K] =
+func to_multiset*[K](arr: openArray[(K, int)]): MultisetRef[K] =
   var m = init_multiset[K]()
   for (k, i) in arr:
     m = m.incl(k, i)
   return m
-template hash*[K](m: PMultisetRef[K]): Hash =
+template hash*[K](m: MultisetRef[K]): Hash =
   m.as_map.hash
-template contains*[K](m: PMultisetRef[K], key: K): bool =
+template contains*[K](m: MultisetRef[K], key: K): bool =
   m.as_map.contains(key)
-template get_count*[K](m: PMultisetRef[K], key: K): int =
+template get_count*[K](m: MultisetRef[K], key: K): int =
   m.as_map.get_or_default(key, 0)
-template natural_count*[K](m: PMultisetRef[K], key: K): bool =
+template natural_count*[K](m: MultisetRef[K], key: K): bool =
   m.as_map.get_or_default(key, 0) >= 0
-template positive_count*[K](m: PMultisetRef[K], key: K): bool =
+template positive_count*[K](m: MultisetRef[K], key: K): bool =
   m.as_map.get_or_default(key, 0) > 0
-template negative_count*[K](m: PMultisetRef[K], key: K): bool =
+template negative_count*[K](m: MultisetRef[K], key: K): bool =
   m.as_map.get_or_default(key, 0) < 0
-template len*[K](m: PMultisetRef[K]): Natural =
+template len*[K](m: MultisetRef[K]): Natural =
   m.as_map.len
-iterator items*[K](m: PMultisetRef[K]): K =
+iterator items*[K](m: MultisetRef[K]): K =
   for k in m.as_map.keys:
     yield k
-iterator keys*[K](m: PMultisetRef[K]): K =
+iterator keys*[K](m: MultisetRef[K]): K =
   for k in m.as_map.keys:
     yield k
-iterator pairs*[K](m: PMultisetRef[K]): K =
+iterator pairs*[K](m: MultisetRef[K]): K =
   for p in m.as_map.pairs:
     yield p
-template `==`*[K](m1, m2: PMultisetRef[K]): bool =
+template `==`*[K](m1, m2: MultisetRef[K]): bool =
   m1.as_map == m2.as_map
-template valid*[K](m: PMultisetRef[K]): bool =
+template valid*[K](m: MultisetRef[K]): bool =
   m.as_map.valid
-template to_json*[K](m: PMultisetRef[K]): string =
+template to_json*[K](m: MultisetRef[K]): string =
   m.as_map.to_json

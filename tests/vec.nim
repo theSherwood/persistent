@@ -190,7 +190,7 @@ proc main* =
             (sz div 3)..(sz div 3),
           ]
           to_insert_seq: seq[int]
-          to_insert_vec: PVecRef[int]
+          to_insert_vec: VecRef[int]
         for size in sizes:
           to_insert_seq = toSeq(offset..<(sz + offset))
           to_insert_vec = to_insert_seq.to_vec
@@ -322,7 +322,7 @@ proc main* =
       proc insert_test(sz: int) =
         var
           to_insert_seq: seq[int]
-          to_insert_vec: PVecRef[int]
+          to_insert_vec: VecRef[int]
           offset = 5
           offset_seq = toSeq(offset..<(sz + offset))
           seq_copy: seq[int]

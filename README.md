@@ -1,6 +1,8 @@
 # persistent
 
-## Build
+Implements persistent vec, map, set, and multiset. 
+
+## Usage
 
 ### Build Native
 
@@ -13,10 +15,6 @@ OR
 ```sh
 wach -o "src/**" "./run.sh -tu native"
 ```
-
-TODO
-
-## Test
 
 ### Test Native
 
@@ -64,8 +62,10 @@ OR
 ./run.sh -tur browser32
 ```
 
-## Benchmark
+### Benchmark
 
 ```sh
 ./run.sh -bur
 ```
+
+## State
