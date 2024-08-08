@@ -477,7 +477,7 @@ func delete_by_hash*[K, V](m: MapRef[K, V], h: Hash, key: K): MapRef[K, V] =
     result = MapRef[K, V]()
     result.node = m.node
     result.hash = m.hash
-    result.size = m.size + 1
+    result.size = m.size
     var
       bits = 0
       node: MapNodeRef[K, V]
@@ -494,7 +494,6 @@ func delete_by_hash*[K, V](m: MapRef[K, V], h: Hash, key: K): MapRef[K, V] =
         of kEmpty:
           return m
         of kLeaf:
-          result.size = m.size
           let e_entry = node_list_entry.hashed_entry
           if e_entry.hash == h and e_entry.key == key:
             result.hash = m.hash xor entry_hash(e_entry)
