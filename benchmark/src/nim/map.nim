@@ -1,6 +1,6 @@
 import std/[sequtils]
-import ../../../../src/map
-import ../common
+import ../../../src/map
+import common
 
 proc setup_seq_of_pmaps*(sz, it, offset: int): seq[MapRef[int, int]] =
   var i_off, k: int
