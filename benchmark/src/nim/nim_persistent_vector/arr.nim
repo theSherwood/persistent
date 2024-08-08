@@ -10,7 +10,7 @@ proc setup_seq_of_persvector_arrs*(sz, it, offset: int): seq[PersistentVector[in
     i_off = i + offset
     a = [i_off].toPersistentVector
     for j in 1..<sz:
-      k = i_off + (j * 17)
+      k = i_off + (j * 100)
       a = a.add(k)
     result.add(a)
 template setup_seq_of_persvector_arrs*(sz, it: int): seq[PersistentVector[int]] = setup_seq_of_persvector_arrs(sz, it, 0)

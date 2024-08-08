@@ -9,7 +9,7 @@ proc setup_seq_of_pmaps*(sz, it, offset: int): seq[MapRef[int, int]] =
     i_off = i + offset
     m = [(i_off, i_off)].to_map
     for j in 1..<sz:
-      k = i_off + (j * 17)
+      k = i_off + (j * 100)
       m = m.add(k, k)
     result.add(m)
 template setup_seq_of_pmaps*(sz, it: int): seq[MapRef[int, int]] = setup_seq_of_pmaps(sz, it, 0)

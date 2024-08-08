@@ -10,7 +10,7 @@ proc setup_seq_of_pvec_arrs*(sz, it, offset: int): seq[VecRef[int]] =
     i_off = i + offset
     a = [i_off].to_vec
     for j in 1..<sz:
-      k = i_off + (j * 17)
+      k = i_off + (j * 100)
       a = a.add(k)
     result.add(a)
 template setup_seq_of_pvec_arrs*(sz, it: int): seq[VecRef[int]] = setup_seq_of_pvec_arrs(sz, it, 0)

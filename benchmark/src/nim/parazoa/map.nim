@@ -9,7 +9,7 @@ proc setup_seq_of_parazoa_maps*(sz, it, offset: int): seq[Map[int, int]] =
     i_off = i + offset
     m = [(i_off, i_off)].toMap
     for j in 1..<sz:
-      k = i_off + (j * 17)
+      k = i_off + (j * 100)
       m = m.add(k, k)
     result.add(m)
 template setup_seq_of_parazoa_maps*(sz, it: int): seq[Map[int, int]] = setup_seq_of_parazoa_maps(sz, it, 0)
