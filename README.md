@@ -26,22 +26,10 @@ Refer to the test suite for more.
 ./run.sh -tu native
 ```
 
-OR
-
-```sh
-wach -o "src/**" "./run.sh -tu native"
-```
-
 ### Test Native
 
 ```sh
 ./run.sh -tur native
-```
-
-OR
-
-```sh
-wach ./run.sh -tur native
 ```
 
 ### Test Wasm in Node
@@ -50,18 +38,12 @@ wach ./run.sh -tur native
 ./run.sh -tur node32
 ```
 
-OR
-
-```sh
-wach -o "src/**" "./run.sh -tur node32"
-```
-
 ### Test Wasm in Browser
 
 Compile wasm:
 
 ```sh
-wach -o "src/**" "./run.sh -tu browser32"
+./run.sh -tur browser32
 ```
 
 Start the server:
@@ -71,12 +53,6 @@ dev start
 ```
 
 Go to http://localhost:3000/
-
-OR
-
-```sh
-./run.sh -tur browser32
-```
 
 ### Benchmark
 
@@ -93,6 +69,8 @@ The vecs are trees with a main branching factor of 32. They do not take the typi
 The maps are hash tries. The sets and multisets are built on the maps.
 
 All the collections maintain hashes for fast equality comparisons. 
+
+The code is something of a mess at the moment.
 
 ### TODO
 
